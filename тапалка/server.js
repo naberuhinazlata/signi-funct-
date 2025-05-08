@@ -1,5 +1,4 @@
 const express = require('express');
-const bcrypt = require('bcrypt');
 const crypto = require('crypto');
 const users = require('./index.js'); // Импортируем объект users
 const app = express();
@@ -19,11 +18,11 @@ app.get('/upgrades', (req, res) => {
 
 // Отримати один апгрейд
 app.get('/upgrades/:id', (req, res) => {
-  const upgrade = upgrades.find(u => u.id === parseInt(req.params.id));
-  if (!upgrade) {
+  const upgrade1 = upgrades.find(u => u.id === parseInt(req.params.id));
+  if (!upgrade1) {
     return res.status(404).json({ error: "Upgrade не знайдено" });
   }
-  res.json(upgrade);
+  res.json(upgrade1);
 });
 
 // Додати новий апгрейд
@@ -52,9 +51,9 @@ app.post('/upgrades', (req, res) => {
 // Оновити апгрейд
 app.put('/upgrades/:id', (req, res) => {
   const { name, description, price } = req.body;
-  const upgrade = upgrades.find(u => u.id === parseInt(req.params.id));
+  const upgrade1 = upgrades.find(u => u.id === parseInt(req.params.id));
 
-  if (!upgrade) {
+  if (!upgrade1) {
     return res.status(404).json({ error: "Upgrade не знайдено" });
   } // Перевірка на існування апгрейду
 
@@ -66,11 +65,11 @@ app.put('/upgrades/:id', (req, res) => {
     return res.status(400).json({ error: "Назва та опис не можуть бути пустими" });
   } //Перевірка на пусті поля
 
-  upgrade.name = name;
-  upgrade.description = description;
-  upgrade.price = price;
+  upgrade1.name = name;
+  upgrade1.description = description;
+  upgrade1.price = price;
 
-  res.json(upgrade);
+  res.json(upgrade1);
 });
 
 // Видалити апгрейд
@@ -85,7 +84,7 @@ app.delete('/upgrades/:id', (req, res) => {
   res.status(204).send();
 });
 
-let users = []; // Масив для зберігання користувачів
+let user = []; // Масив для зберігання користувачів
 
 // Реєстрація
 app.post('/sign-up', async (req, res) => {
@@ -99,13 +98,13 @@ app.post('/sign-up', async (req, res) => {
     return res.status(400).json({ error: "Пароль має бути не коротшим за 8 символів" });
   }
 
-  const existingUser = users.find(user => user.email === email);
+  const existingUser = user.find(user => user.email === email);
   if (existingUser) {
     return res.status(400).json({ error: "Користувач із таким email вже існує" });
   }
 
   const hashedPassword = await bcrypt.hash(password, 10); // Хешування пароля
-  users.push({ email, password: hashedPassword });
+  user.push({ email, password: hashedPassword });
 
   res.status(201).json({ message: "Реєстрація успішна!" });
 });
@@ -130,6 +129,63 @@ app.post('/sign-in', async (req, res) => {
 
   const token = crypto.randomBytes(16).toString('hex'); // Генерація токена
   res.status(200).json({ token });
+});
+
+// Список доступних апгрейдів
+const upgrade = [
+  { id: "click-accelerator", name: "Click Accelerator", price: 40000, type: "multiplyClick", value: 10 },
+  { id: "passive-boost", name: "Passive Boost", price: 30000, type: "addPassive", value: 5 },
+  { id: "click-bonus", name: "Click Bonus", price: 20000, type: "addClick", value: 2 },
+  { id: "passive-multiplier", name: "Passive Multiplier", price: 50000, type: "multiplyPassive", value: 2 },
+];
+
+// Ендпоінт для покупки апгрейду
+app.post('/buy-upgrade', (req, res) => {
+  const { userId, upgradeId } = req.body;
+
+// Перевірка наявності користувача
+if (!user) {
+  return res.status(404).json({ error: "Користувача не знайдено" });
+}
+
+// Знаходимо апгрейд
+const upgrade = upgrades.find(u => u.id === upgradeId);
+if (!upgrade) {
+  return res.status(404).json({ error: "Апгрейд не знайдено" });
+}
+
+// Перевірка балансу користувача
+if (user.balance < upgrade.price) {
+  return res.status(400).json({ error: "Недостатньо коштів для покупки апгрейду" });
+}
+
+// Знімаємо ціну апгрейду з балансу
+user.balance -= upgrade.price;
+
+// Застосовуємо ефект апгрейду
+switch (upgrade.type) {  //конструкция, которая позволяет выполнять инструкции исходя из значения выражений
+  case "multiplyClick":
+  user.coinsPerClick *= upgrade.value;
+  break; //Оператор break прерывает выполнение текущего цикла
+  case "addClick":
+  user.coinsPerClick += upgrade.value;
+  break;
+  case "multiplyPassive":
+  user.passiveIncomePerSecond *= upgrade.value;
+  break;
+  case "addPassive":
+  user.passiveIncomePerSecond += upgrade.value;
+  break;
+  default:
+  return res.status(409).json({ error: "Невірний тип ефекту апгрейду" });
+}
+
+// Повертаємо оновлені дані користувача
+res.status(200).json({
+  balance: user.balance,
+  coinsPerClick: user.coinsPerClick,
+  passiveIncomePerSecond: user.passiveIncomePerSecond,
+});
 });
 
 // Запуск сервера
